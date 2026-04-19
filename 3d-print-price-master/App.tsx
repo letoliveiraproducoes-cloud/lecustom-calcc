@@ -394,20 +394,8 @@ export default function App() {
   return (
     <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 overflow-hidden">
 
-      {/* Overlay mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-10 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar — fixed no mobile (fora do fluxo), static no desktop */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-20 w-3/4 max-w-[260px] bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300 ease-in-out",
-        "lg:static lg:w-64 lg:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      {/* Sidebar — escondida no mobile, visível no desktop */}
+      <aside className="hidden lg:flex lg:w-64 bg-[#23395d] flex-col border-r border-[#1a2d4a] shadow-xl shrink-0">
           <div className="p-6 flex flex-col items-center border-b border-[#1a2d4a]/50">
             {/* Logo SVG */}
             <div className="relative w-24 h-24 mb-4">
@@ -501,22 +489,8 @@ export default function App() {
 
       {/* Main Content — sempre ocupa toda a largura no mobile */}
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex-1 min-w-0 flex flex-col h-full">
-        <main className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 p-4 lg:p-8">
-          {/* Mobile header */}
-          <div className="flex items-center gap-3 mb-6 lg:hidden">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-lg bg-[#23395d] text-white"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <h1 className="text-xl font-bold">
-              <span className="text-[#69bfa8]">Le</span>
-              <span className="text-[#23395d]">Custom</span>
-            </h1>
-          </div>
+        <main className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 p-4 pb-24 lg:pb-8 lg:p-8">
+
           <AnimatePresence mode="wait">
             <TabsContent value="calculator" className="mt-0 outline-none h-full">
               <motion.div 
@@ -1579,6 +1553,39 @@ export default function App() {
           </footer>
         </main>
       </Tabs>
+      {/* Bottom Navigation — só no mobile */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#23395d] border-t border-[#1a2d4a] flex lg:hidden">
+        {[
+          { value: 'calculator', icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" strokeWidth="2"/><path d="M8 9h8M8 12h5M8 15h3" strokeWidth="2" strokeLinecap="round"/></svg>
+          ), label: 'Calcular' },
+          { value: 'materials', icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          ), label: 'Materiais' },
+          { value: 'hardware', icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" strokeWidth="2"/></svg>
+          ), label: 'Hardware' },
+          { value: 'history', icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="2"/><path d="M12 6v6l4 2" strokeWidth="2" strokeLinecap="round"/></svg>
+          ), label: 'Histórico' },
+          { value: 'settings', icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" strokeWidth="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" strokeWidth="2"/></svg>
+          ), label: 'Ajustes' },
+        ].map(({ value, icon, label }) => (
+          <button
+            key={value}
+            onClick={() => setActiveTab(value)}
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors",
+              activeTab === value ? "text-[#f2c94c]" : "text-white/50"
+            )}
+          >
+            {icon}
+            <span className="text-[10px] font-medium">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       <Toaster position="top-right" richColors />
     </div>
   );
