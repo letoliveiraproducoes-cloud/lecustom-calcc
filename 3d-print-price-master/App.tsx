@@ -393,21 +393,21 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 overflow-hidden">
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex w-full h-full min-w-0">
-        
-        {/* Overlay mobile */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-10 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
 
-        {/* Sidebar */}
-        <aside className={cn(
-          "fixed lg:static inset-y-0 left-0 z-20 w-3/4 max-w-[260px] lg:w-64 bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300 ease-in-out",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}>
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-10 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed no mobile (fora do fluxo), static no desktop */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-20 w-3/4 max-w-[260px] bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300 ease-in-out",
+        "lg:static lg:w-64 lg:translate-x-0",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
           <div className="p-6 flex flex-col items-center border-b border-[#1a2d4a]/50">
             {/* Logo SVG */}
             <div className="relative w-24 h-24 mb-4">
@@ -497,9 +497,10 @@ export default function App() {
               Sair
             </Button>
           </div>
-        </aside>
+      </aside>
 
-        {/* Main Content */}
+      {/* Main Content — sempre ocupa toda a largura no mobile */}
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex-1 min-w-0 flex flex-col h-full">
         <main className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 p-4 lg:p-8">
           {/* Mobile header */}
           <div className="flex items-center gap-3 mb-6 lg:hidden">
