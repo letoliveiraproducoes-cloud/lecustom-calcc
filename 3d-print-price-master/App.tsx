@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from './firebase';
+import {
+  collection, doc, setDoc, deleteDoc, onSnapshot,
+  getDoc, writeBatch
+} from 'firebase/firestore';
+import { auth, db } from './firebase';
 import Login from './Login';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -23,7 +27,6 @@ import {
   Share2, Search, Filter, Package, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import { ProjectData, BaseSettings, Filament, Hardware, PrinterProfile, ProjectHardware } from './types';
 import { cn } from '@/lib/utils';
 
@@ -54,11 +57,115 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const [settings, setSettings] = useLocalStorage<BaseSettings>('3d_print_settings', DEFAULT_SETTINGS);
-  const [history, setHistory] = useLocalStorage<ProjectData[]>('3d_print_history', []);
-  const [filaments, setFilaments] = useLocalStorage<Filament[]>('3d_print_filaments', []);
-  const [hardwareLibrary, setHardwareLibrary] = useLocalStorage<Hardware[]>('3d_print_hardware', []);
-  const [printers, setPrinters] = useLocalStorage<PrinterProfile[]>('3d_print_printers', []);
+  const [settings, setSettingsState] = useState<BaseSettings>(DEFAULT_SETTINGS);
+  const [history, setHistory] = useState<ProjectData[]>([]);
+  const [filaments, setFilaments] = useState<Filament[]>([]);
+  const [hardwareLibrary, setHardwareLibrary] = useState<Hardware[]>([]);
+  const [printers, setPrinters] = useState<PrinterProfile[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // ── Firestore: carregar dados em tempo real ──────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    setDataLoading(true);
+    let loaded = 0;
+    const total = 5;
+    const checkDone = () => { if (++loaded >= total) setDataLoading(false); };
+
+    // Settings (documento único)
+    const unsubSettings = onSnapshot(doc(db, 'users', uid, 'data', 'settings'), snap => {
+      if (snap.exists()) setSettingsState(snap.data() as BaseSettings);
+      checkDone();
+    });
+
+    // Coleções
+    const unsubHistory = onSnapshot(collection(db, 'users', uid, 'history'), snap => {
+      setHistory(snap.docs.map(d => d.data() as ProjectData).sort((a, b) => b.date.localeCompare(a.date)));
+      checkDone();
+    });
+    const unsubFilaments = onSnapshot(collection(db, 'users', uid, 'filaments'), snap => {
+      setFilaments(snap.docs.map(d => d.data() as Filament));
+      checkDone();
+    });
+    const unsubHardware = onSnapshot(collection(db, 'users', uid, 'hardware'), snap => {
+      setHardwareLibrary(snap.docs.map(d => d.data() as Hardware));
+      checkDone();
+    });
+    const unsubPrinters = onSnapshot(collection(db, 'users', uid, 'printers'), snap => {
+      setPrinters(snap.docs.map(d => d.data() as PrinterProfile));
+      checkDone();
+    });
+
+    return () => {
+      unsubSettings(); unsubHistory(); unsubFilaments();
+      unsubHardware(); unsubPrinters();
+    };
+  }, [user]);
+
+  // ── Helpers de escrita no Firestore ─────────────────────────────────────
+  const setSettings = useCallback(async (newSettings: BaseSettings) => {
+    if (!user) return;
+    setSettingsState(newSettings);
+    await setDoc(doc(db, 'users', user.uid, 'data', 'settings'), newSettings);
+  }, [user]);
+
+  const addFilament = useCallback(async (f: Filament) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'filaments', f.id), f);
+  }, [user]);
+
+  const removeFilament = useCallback(async (id: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'filaments', id));
+  }, [user]);
+
+  const updateFilament = useCallback(async (f: Filament) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'filaments', f.id), f);
+  }, [user]);
+
+  const addHardware = useCallback(async (h: Hardware) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'hardware', h.id), h);
+  }, [user]);
+
+  const removeHardware = useCallback(async (id: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'hardware', id));
+  }, [user]);
+
+  const updateHardware = useCallback(async (h: Hardware) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'hardware', h.id), h);
+  }, [user]);
+
+  const addPrinter = useCallback(async (p: PrinterProfile) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'printers', p.id), p);
+  }, [user]);
+
+  const removePrinter = useCallback(async (id: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'printers', id));
+  }, [user]);
+
+  const saveProject = useCallback(async (project: ProjectData) => {
+    if (!user) return;
+    await setDoc(doc(db, 'users', user.uid, 'history', project.id), project);
+  }, [user]);
+
+  const removeProject = useCallback(async (id: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'history', id));
+  }, [user]);
+
+  const clearHistory = useCallback(async () => {
+    if (!user) return;
+    const batch = writeBatch(db);
+    history.forEach(item => batch.delete(doc(db, 'users', user.uid, 'history', item.id)));
+    await batch.commit();
+  }, [user, history]);
   
   // Sync calculator defaults when settings change
   useEffect(() => {
@@ -168,7 +275,7 @@ export default function App() {
     setTimeout(() => setCopiedPrice(null), 2000);
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newProject: ProjectData = {
       id: crypto.randomUUID(),
       name: projectName || `Projeto ${history.length + 1}`,
@@ -191,32 +298,27 @@ export default function App() {
       custoBase: results.totalCustoBase,
       precos: results.precos,
     };
-    
-    // Update stock if filament is selected
+
+    // Atualizar estoque do filamento
     if (currentFilament) {
       const usedAmount = pesoPeca * batchQuantity;
-      setFilaments(filaments.map(f => 
-        f.id === currentFilament.id 
-          ? { ...f, stockGrams: Math.max(0, f.stockGrams - usedAmount) }
-          : f
-      ));
-      if (currentFilament.stockGrams - usedAmount < currentFilament.minStockGrams) {
+      const updated = { ...currentFilament, stockGrams: Math.max(0, currentFilament.stockGrams - usedAmount) };
+      await updateFilament(updated);
+      if (updated.stockGrams < currentFilament.minStockGrams) {
         toast.warning(`Estoque baixo: ${currentFilament.name}`);
       }
     }
 
-    // Update hardware stock
-    selectedHardware.forEach(sh => {
+    // Atualizar estoque do hardware
+    for (const sh of selectedHardware) {
       const h = hardwareLibrary.find(hl => hl.id === sh.hardwareId);
       if (h) {
         const used = sh.quantity * batchQuantity;
-        setHardwareLibrary(prev => prev.map(item => 
-          item.id === h.id ? { ...item, stockUnits: Math.max(0, item.stockUnits - used) } : item
-        ));
+        await updateHardware({ ...h, stockUnits: Math.max(0, h.stockUnits - used) });
       }
-    });
+    }
 
-    setHistory([newProject, ...history]);
+    await saveProject(newProject);
     toast.success("Orçamento salvo com sucesso!");
     setProjectName('');
     setActiveTab('history');
@@ -250,7 +352,7 @@ export default function App() {
   }, [history]);
 
   const deleteHistoryItem = (id: string) => {
-    setHistory(history.filter(item => item.id !== id));
+    removeProject(id);
   };
 
   const handleLogout = async () => {
@@ -271,6 +373,15 @@ export default function App() {
         <Login />
         <Toaster position="top-right" richColors />
       </>
+    );
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-[#23395d] flex flex-col items-center justify-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#f2c94c]"></div>
+        <p className="text-white/60 text-sm">Carregando seus dados...</p>
+      </div>
     );
   }
 
@@ -721,7 +832,7 @@ export default function App() {
                           minStockGrams: Number(formData.get('minStockGrams')),
                           maxStockGrams: Number(formData.get('maxStockGrams')) || Number(formData.get('stockGrams')) || 1000,
                         };
-                        setFilaments([...filaments, newFilament]);
+                        addFilament(newFilament);
                         toast.success("Filamento adicionado!");
                       }}>
                         <div className="grid gap-4 py-4">
@@ -806,7 +917,7 @@ export default function App() {
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setFilaments(filaments.filter(item => item.id !== f.id))}>
+                        <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeFilament(f.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -922,7 +1033,7 @@ export default function App() {
                     <Button variant="outline" onClick={() => setSettings(DEFAULT_SETTINGS)}>
                       Resetar para Padrão
                     </Button>
-                    <Button className="bg-zinc-900" onClick={() => toast.success("Configurações salvas!")}>
+                    <Button className="bg-zinc-900" onClick={() => { setSettings(settings); toast.success("Configurações salvas!"); }}>
                       Salvar Alterações
                     </Button>
                   </CardFooter>
@@ -964,7 +1075,7 @@ export default function App() {
                           stockUnits: Number(formData.get('stockUnits')),
                           minStockUnits: Number(formData.get('minStockUnits')),
                         };
-                        setHardwareLibrary([...hardwareLibrary, newItem]);
+                        addHardware(newItem);
                         toast.success("Hardware adicionado!");
                       }}>
                         <div className="grid gap-4 py-4">
@@ -1021,7 +1132,7 @@ export default function App() {
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => setHardwareLibrary(hardwareLibrary.filter(item => item.id !== h.id))}>
+                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => removeHardware(h.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -1066,7 +1177,7 @@ export default function App() {
                           maintenanceCostHour: Number(formData.get('maintenanceCostHour')),
                           hourlyRate: Number(formData.get('hourlyRate')),
                         };
-                        setPrinters([...printers, newPrinter]);
+                        addPrinter(newPrinter);
                         toast.success("Impressora adicionada!");
                       }}>
                         <div className="grid gap-4 py-4">
@@ -1120,7 +1231,7 @@ export default function App() {
                         </div>
                       </CardContent>
                       <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => setPrinters(printers.filter(item => item.id !== p.id))}>
+                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => removePrinter(p.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -1229,7 +1340,7 @@ export default function App() {
                 
                 {history.length > 0 && (
                   <div className="flex justify-end">
-                    <Button variant="ghost" className="text-destructive" onClick={() => setHistory([])}>
+                    <Button variant="ghost" className="text-destructive" onClick={clearHistory}>
                       Limpar Todo o Histórico
                     </Button>
                   </div>
