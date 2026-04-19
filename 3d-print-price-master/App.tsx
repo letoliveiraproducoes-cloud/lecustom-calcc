@@ -393,7 +393,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 overflow-hidden">
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex w-full h-full">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex w-full h-full min-w-0">
         
         {/* Overlay mobile */}
         {sidebarOpen && (
@@ -405,7 +405,7 @@ export default function App() {
 
         {/* Sidebar */}
         <aside className={cn(
-          "fixed lg:relative inset-y-0 left-0 z-20 w-64 bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300",
+          "fixed lg:static inset-y-0 left-0 z-20 w-3/4 max-w-[260px] lg:w-64 bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}>
           <div className="p-6 flex flex-col items-center border-b border-[#1a2d4a]/50">
@@ -500,7 +500,7 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto bg-zinc-50 p-4 lg:p-8">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-zinc-50 p-4 lg:p-8">
           {/* Mobile header */}
           <div className="flex items-center gap-3 mb-6 lg:hidden">
             <button
