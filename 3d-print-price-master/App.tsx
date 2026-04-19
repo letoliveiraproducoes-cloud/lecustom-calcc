@@ -178,6 +178,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState('calculator');
   const [copiedPrice, setCopiedPrice] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Form State
   const [projectName, setProjectName] = useState('');
@@ -201,6 +202,11 @@ export default function App() {
 
   // History Filter
   const [historySearch, setHistorySearch] = useState('');
+
+  // Edit states
+  const [editingFilament, setEditingFilament] = useState<Filament | null>(null);
+  const [editingHardware, setEditingHardware] = useState<Hardware | null>(null);
+  const [editingPrinter, setEditingPrinter] = useState<PrinterProfile | null>(null);
 
   // Derived Values
   const currentFilament = useMemo(() => filaments.find(f => f.id === selectedFilamentId), [filaments, selectedFilamentId]);
@@ -387,10 +393,21 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 overflow-hidden">
-      <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex w-full h-full">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSidebarOpen(false); }} orientation="vertical" className="flex w-full h-full">
         
+        {/* Overlay mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-10 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-64 bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl z-20 shrink-0">
+        <aside className={cn(
+          "fixed lg:relative inset-y-0 left-0 z-20 w-64 bg-[#23395d] flex flex-col border-r border-[#1a2d4a] shadow-xl shrink-0 transition-transform duration-300",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}>
           <div className="p-6 flex flex-col items-center border-b border-[#1a2d4a]/50">
             {/* Logo SVG */}
             <div className="relative w-24 h-24 mb-4">
@@ -484,6 +501,21 @@ export default function App() {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto bg-zinc-50 p-4 lg:p-8">
+          {/* Mobile header */}
+          <div className="flex items-center gap-3 mb-6 lg:hidden">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg bg-[#23395d] text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-bold">
+              <span className="text-[#69bfa8]">Le</span>
+              <span className="text-[#23395d]">Custom</span>
+            </h1>
+          </div>
           <AnimatePresence mode="wait">
             <TabsContent value="calculator" className="mt-0 outline-none h-full">
               <motion.div 
@@ -909,15 +941,18 @@ export default function App() {
                             </span>
                           </div>
                           <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className={cn("h-full transition-all", f.stockGrams <= f.minStockGrams ? "bg-amber-500" : "bg-zinc-900")}
                               style={{ width: `${Math.min(100, (f.stockGrams / (f.maxStockGrams || 1)) * 100)}%` }}
                             />
                           </div>
                         </div>
                       </CardContent>
-                      <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeFilament(f.id)}>
+                      <CardFooter className="pt-2 gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingFilament(f)}>
+                          Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeFilament(f.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -928,7 +963,77 @@ export default function App() {
               </motion.div>
             </TabsContent>
 
-            <TabsContent value="settings" className="mt-0 outline-none">
+            {/* Dialog edição filamento */}
+            <Dialog open={!!editingFilament} onOpenChange={(open) => !open && setEditingFilament(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Filamento</DialogTitle>
+                </DialogHeader>
+                {editingFilament && (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const updated: Filament = {
+                      ...editingFilament,
+                      name: fd.get('name') as string,
+                      brand: fd.get('brand') as string,
+                      type: fd.get('type') as string,
+                      color: fd.get('color') as string,
+                      custoKg: Number(fd.get('custoKg')),
+                      stockGrams: Number(fd.get('stockGrams')),
+                      minStockGrams: Number(fd.get('minStockGrams')),
+                      maxStockGrams: Number(fd.get('maxStockGrams')) || editingFilament.maxStockGrams,
+                    };
+                    updateFilament(updated);
+                    setEditingFilament(null);
+                    toast.success("Filamento atualizado!");
+                  }}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Nome</Label>
+                        <Input name="name" defaultValue={editingFilament.name} className="col-span-3" required />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Marca</Label>
+                        <Input name="brand" defaultValue={editingFilament.brand} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 items-center gap-4">
+                          <Label className="text-right">Tipo</Label>
+                          <Input name="type" defaultValue={editingFilament.type} />
+                        </div>
+                        <div className="grid grid-cols-2 items-center gap-4">
+                          <Label className="text-right">Cor</Label>
+                          <Input name="color" defaultValue={editingFilament.color} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Custo/kg</Label>
+                        <Input name="custoKg" type="number" defaultValue={editingFilament.custoKg} className="col-span-3" required />
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <Label>Estoque (g)</Label>
+                          <Input name="stockGrams" type="number" defaultValue={editingFilament.stockGrams} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Mínimo (g)</Label>
+                          <Input name="minStockGrams" type="number" defaultValue={editingFilament.minStockGrams} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Máximo (g)</Label>
+                          <Input name="maxStockGrams" type="number" defaultValue={editingFilament.maxStockGrams} />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEditingFilament(null)}>Cancelar</Button>
+                      <Button type="submit">Salvar</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1131,8 +1236,11 @@ export default function App() {
                           </span>
                         </div>
                       </CardContent>
-                      <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => removeHardware(h.id)}>
+                      <CardFooter className="pt-2 gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingHardware(h)}>
+                          Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex-1 text-destructive" onClick={() => removeHardware(h.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -1142,6 +1250,61 @@ export default function App() {
                 </div>
               </motion.div>
             </TabsContent>
+
+            {/* Dialog edição hardware */}
+            <Dialog open={!!editingHardware} onOpenChange={(open) => !open && setEditingHardware(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Hardware</DialogTitle>
+                </DialogHeader>
+                {editingHardware && (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const updated: Hardware = {
+                      ...editingHardware,
+                      name: fd.get('name') as string,
+                      category: fd.get('category') as string,
+                      costPerUnit: Number(fd.get('costPerUnit')),
+                      stockUnits: Number(fd.get('stockUnits')),
+                      minStockUnits: Number(fd.get('minStockUnits')),
+                    };
+                    updateHardware(updated);
+                    setEditingHardware(null);
+                    toast.success("Hardware atualizado!");
+                  }}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Nome</Label>
+                        <Input name="name" defaultValue={editingHardware.name} className="col-span-3" required />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Categoria</Label>
+                        <Input name="category" defaultValue={editingHardware.category} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Custo/Un</Label>
+                        <Input name="costPerUnit" type="number" step="0.01" defaultValue={editingHardware.costPerUnit} className="col-span-3" required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label>Estoque</Label>
+                          <Input name="stockUnits" type="number" defaultValue={editingHardware.stockUnits} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Mínimo</Label>
+                          <Input name="minStockUnits" type="number" defaultValue={editingHardware.minStockUnits} />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEditingHardware(null)}>Cancelar</Button>
+                      <Button type="submit">Salvar</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
 
             <TabsContent value="printers" className="mt-0 outline-none">
               <motion.div 
@@ -1230,8 +1393,11 @@ export default function App() {
                           <span>{formatCurrency((p.energyConsumption/1000 * p.energyCostKwh) + p.maintenanceCostHour + p.hourlyRate)}</span>
                         </div>
                       </CardContent>
-                      <CardFooter className="pt-2">
-                        <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => removePrinter(p.id)}>
+                      <CardFooter className="pt-2 gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingPrinter(p)}>
+                          Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex-1 text-destructive" onClick={() => removePrinter(p.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Remover
                         </Button>
@@ -1241,6 +1407,60 @@ export default function App() {
                 </div>
               </motion.div>
             </TabsContent>
+
+            {/* Dialog edição impressora */}
+            <Dialog open={!!editingPrinter} onOpenChange={(open) => !open && setEditingPrinter(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Impressora</DialogTitle>
+                </DialogHeader>
+                {editingPrinter && (
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const updated: PrinterProfile = {
+                      ...editingPrinter,
+                      name: fd.get('name') as string,
+                      energyConsumption: Number(fd.get('energyConsumption')),
+                      energyCostKwh: Number(fd.get('energyCostKwh')),
+                      maintenanceCostHour: Number(fd.get('maintenanceCostHour')),
+                      hourlyRate: Number(fd.get('hourlyRate')),
+                    };
+                    addPrinter(updated);
+                    setEditingPrinter(null);
+                    toast.success("Impressora atualizada!");
+                  }}>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Nome</Label>
+                        <Input name="name" defaultValue={editingPrinter.name} className="col-span-3" required />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Consumo (W)</Label>
+                        <Input name="energyConsumption" type="number" defaultValue={editingPrinter.energyConsumption} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Custo kWh</Label>
+                        <Input name="energyCostKwh" type="number" step="0.01" defaultValue={editingPrinter.energyCostKwh} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Manut./h</Label>
+                        <Input name="maintenanceCostHour" type="number" step="0.01" defaultValue={editingPrinter.maintenanceCostHour} className="col-span-3" />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Taxa/h (R$)</Label>
+                        <Input name="hourlyRate" type="number" step="0.01" defaultValue={editingPrinter.hourlyRate} className="col-span-3" />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEditingPrinter(null)}>Cancelar</Button>
+                      <Button type="submit">Salvar</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
+
             <TabsContent value="history" className="mt-0 outline-none">
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
